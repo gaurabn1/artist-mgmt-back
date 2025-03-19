@@ -32,18 +32,18 @@ class ArtistSerializer(serializers.Serializer):
         first_released_year = attrs.get("first_released_year", "")
         current_date = datetime.now().date()
 
-        if first_released_year > current_date.year:
+        if dob and dob > current_date:
+            raise serializers.ValidationError("Date of birth cannot be in the future.")
+
+        if first_released_year and first_released_year > current_date.year:
             raise serializers.ValidationError(
                 "First released year cannot be in the future."
             )
 
-        if dob.year > first_released_year:
+        if first_released_year and dob.year > first_released_year:
             raise serializers.ValidationError(
                 "Date of birth cannot be greater than first released year."
             )
-
-        if dob > current_date:
-            raise serializers.ValidationError("Date of birth cannot be in the future.")
 
         return attrs
 
@@ -51,27 +51,12 @@ class ArtistSerializer(serializers.Serializer):
         return Artist.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
-        print(instance)
         with connection.cursor() as c:
             c.execute(
                 """
-                UPDATE core_baseprofilemodel
-                SET gender = %s, address = %s, dob = %s
-                WHERE uuid = %s
-                """,
-                [
-                    validated_data.get("gender", instance.get("gender", "")),
-                    validated_data.get("address", instance.get("address", "")),
-                    validated_data.get("dob", instance.get("dob", "")),
-                    validated_data.get("uuid", instance.get("uuid", "")),
-                ],
-            )
-
-            c.execute(
-                """
                 UPDATE artists_artist
-                SET name = %s, first_released_year = %s, no_of_album_released = %s
-                WHERE baseprofilemodel_ptr_id = %s
+                SET name = %s, first_released_year = %s, no_of_album_released = %s, dob = %s, gender = %s, address = %s, manager_id = %s
+                WHERE uuid = %s
                 """,
                 [
                     validated_data.get("name", instance.get("name", "")),
@@ -79,10 +64,13 @@ class ArtistSerializer(serializers.Serializer):
                         "first_released_year", instance.get("first_released_year", "")
                     ),
                     validated_data.get(
-                        "no_of_album_released", instance.get("no_of_album_released", "")
+                        "no_of_album_released", instance.get("no_of_album_released", 0)
                     ),
-                    validated_data.get("uuid", instance.get("uuid", "")),
+                    validated_data.get("dob", instance.get("dob", "")),
+                    validated_data.get("gender", instance.get("gender", "")),
+                    validated_data.get("address", instance.get("address", "")),
                     validated_data.get("manager", instance.get("manager", None)),
+                    instance.get("uuid", ""),
                 ],
             )
             return instance
