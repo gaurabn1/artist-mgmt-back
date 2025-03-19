@@ -25,8 +25,8 @@ class JWTAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Invalid token")
 
         user = self.get_user_from_payload(payload)
-        if not user:
-            raise AuthenticationFailed("User not found or invalid token")
+        if user is None:
+            raise AuthenticationFailed("Invalid token")
 
         return user, token
 
