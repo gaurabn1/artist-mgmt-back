@@ -19,5 +19,5 @@ class UserAdmin(admin.ModelAdmin):
         "is_staff",
         "is_superuser",
     ]
-    list_display = ["email", "role"]
+    list_display = ["email", "role", "is_active"]
     inlines = [UserProfileInline]
