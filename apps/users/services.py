@@ -13,9 +13,9 @@ class UserService:
         with transaction.atomic():
             serializer = UserRegistrationSerializer(data=data)
             serializer.is_valid(raise_exception=True)
-            validated_data = serializer.validated_data
+            user = serializer.save()
 
-            role = validated_data.get("role", "ARTIST")
+            role = data.get("role", "ARTIST")
 
             artist_serializer = None
             manager_serializer = None
@@ -23,17 +23,14 @@ class UserService:
             if role == "ARTIST":
                 artist_serializer = ArtistSerializer(
                     data={
-                        "name": validated_data.get("name", ""),
-                        "first_released_year": validated_data.get(
-                            "first_released_year", None
-                        ),
-                        "no_of_album_released": validated_data.get(
-                            "no_of_album_released", None
-                        ),
-                        "gender": validated_data.get("gender", ""),
-                        "address": validated_data.get("address", ""),
-                        "dob": validated_data.get("dob", None),
-                        "manager": validated_data.get("manager", None),
+                        "user_id": user.get("uuid", None),
+                        "name": data.get("name", ""),
+                        "first_released_year": data.get("first_released_year", None),
+                        "no_of_album_released": data.get("no_of_album_released", 0),
+                        "gender": data.get("gender", ""),
+                        "address": data.get("address", ""),
+                        "dob": data.get("dob", None),
+                        "manager": data.get("manager", None),
                     }
                 )
                 artist_serializer.is_valid(raise_exception=True)
@@ -41,31 +38,30 @@ class UserService:
             elif role == "ARTIST_MANAGER":
                 manager_serializer = UserProfileSerializer(
                     data={
-                        "first_name": validated_data.get("first_name", ""),
-                        "last_name": validated_data.get("last_name", ""),
-                        "phone": validated_data.get("phone", ""),
-                        "gender": validated_data.get("gender", ""),
-                        "address": validated_data.get("address", ""),
-                        "dob": validated_data.get("dob", None),
+                        "user_id": user.get("uuid", None),
+                        "first_name": data.get("first_name", ""),
+                        "last_name": data.get("last_name", ""),
+                        "phone": data.get("phone", ""),
+                        "gender": data.get("gender", ""),
+                        "address": data.get("address", ""),
+                        "dob": data.get("dob", None),
                     }
                 )
                 manager_serializer.is_valid(raise_exception=True)
 
-            user = serializer.save()
-
             if role == "ARTIST" and artist_serializer:
                 artist_serializer.save(user=user)
                 return {
-                    "user": user.email,
-                    "is_active": user.is_active,
+                    "user": user.get("email", None),
+                    "is_active": user.get("is_active", False),
                     "artist": artist_serializer.data,
                 }
 
             elif role == "ARTIST_MANAGER" and manager_serializer:
                 manager_serializer.save(user=user)
                 return {
-                    "user": user.email,
-                    "is_active": user.is_active,
+                    "user": user.get("email", None),
+                    "is_active": user.get("is_active", False),
                     "manager": manager_serializer.data,
                 }
 
@@ -75,9 +71,8 @@ class UserService:
     def login_user(data):
         serializer = UserLoginSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        email = validated_data.get("email", None)
-        password = validated_data.get("password", None)
+        email = data.get("email", None)
+        password = data.get("password", None)
 
         user = authenticate(email=email, password=password)
         if user is not None and user.is_active:

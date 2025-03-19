@@ -1,6 +1,8 @@
+from django.db import connection
 from rest_framework import serializers
 
 from apps.core.models import Artist, User, UserProfile
+from apps.core.utils import convert_tuples_to_dicts
 
 
 class UserRegistrationSerializer(serializers.Serializer):
@@ -35,12 +37,34 @@ class UserRegistrationSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        user = User.objects.create_user(
-            email=validated_data["email"],
-            password=validated_data["password"],
-            role=validated_data["role"],
-        )
-        return user
+        with connection.cursor() as c:
+            c.execute(
+                """
+                INSERT INTO core_user
+                (email, password, role, is_active, created_at, updated_at, is_staff, is_superuser)
+                VALUES (%s, %s, %s, %s, NOW(), NOW(), FALSE, FALSE)
+                RETURNING uuid, email, password, role, is_active
+                """,
+                [
+                    validated_data.get("email", ""),
+                    validated_data.get("password", ""),
+                    validated_data.get("role", ""),
+                    validated_data.get("is_active", False),
+                ],
+            )
+            user = c.fetchone()
+            user = convert_tuples_to_dicts(
+                user,
+                [
+                    "uuid",
+                    "email",
+                    "password",
+                    "role",
+                    "is_active",
+                ],
+            )[0]
+            print(user)
+            return user
 
 
 class UserLoginSerializer(serializers.Serializer):
