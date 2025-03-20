@@ -27,7 +27,7 @@ urlpatterns = [
     path(f"{API_PREFIX}/", include("apps.users.urls")),
     path(f"{API_PREFIX}/artists/", include("apps.artists.urls")),
     # path(f"{API_PREFIX}/musics/", include("apps.musics.urls")),
-    # path(f"{API_PREFIX}/profiles/", include("apps.profiles.urls")),
+    path(f"{API_PREFIX}/profiles/", include("apps.profiles.urls")),
     # path(f"{API_PREFIX}/albums/", include("apps.albums.urls")),
 ]
 

@@ -92,7 +92,7 @@ class ArtistSerializer(serializers.Serializer):
             c.execute(
                 """
                 UPDATE artists_artist
-                SET name = %s, first_released_year = %s, no_of_album_released = %s, dob = %s, gender = %s, address = %s, manager_id = %s
+                SET name = %s, first_released_year = %s, no_of_album_released = %s, dob = %s, gender = %s, address = %s, manager_id = %s, updated_at = NOW()
                 WHERE uuid = %s
                 """,
                 [
