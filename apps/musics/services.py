@@ -9,8 +9,6 @@ class MusicService:
     @staticmethod
     def serialize_data(data):
         serializer = MusicSerializer(data=data)
-        if not serializer.is_valid():
-            print(serializer.errors)
         serializer.is_valid(raise_exception=True)
         return serializer
 

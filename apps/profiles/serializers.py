@@ -66,24 +66,3 @@ class UserProfileSerializer(serializers.Serializer):
             ],
         )[0]
         return manager
-
-    def update(self, instance, validated_data):
-        with connection.cursor() as c:
-            c.execute(
-                """
-                UPDATE profiles_userprofile
-                SET first_name = %s, last_name = %s, phone = %s, gender = %s, address = %s, dob = %s, updated_at = NOW()
-                WHERE uuid = %s
-                """,
-                [
-                    validated_data.get("first_name", instance.get("first_name", "")),
-                    validated_data.get("last_name", instance.get("last_name", "")),
-                    validated_data.get("phone", instance.get("phone", "")),
-                    validated_data.get("gender", instance.get("gender", "")),
-                    validated_data.get("address", instance.get("address", "")),
-                    validated_data.get("dob", instance.get("dob", "")),
-                    instance.get("uuid", ""),
-                ],
-            )
-
-        return instance

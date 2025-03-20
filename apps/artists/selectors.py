@@ -53,8 +53,8 @@ class ArtistSelector:
                 [uuid],
             )
             artist = c.fetchone()
-        artist = convert_tuples_to_dicts(artist, ArtistSelector.FIELD_NAMES)[0]
         if artist is None:
             return None
+        artist = convert_tuples_to_dicts(artist, ArtistSelector.FIELD_NAMES)[0]
         serializer = ArtistSerializer(artist)
         return serializer.data
