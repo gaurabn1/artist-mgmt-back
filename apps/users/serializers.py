@@ -63,7 +63,6 @@ class UserRegistrationSerializer(serializers.Serializer):
                     "is_active",
                 ],
             )[0]
-            print(user)
             return user
 
 

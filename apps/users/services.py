@@ -36,7 +36,6 @@ class UserService:
                 artist_serializer.is_valid(raise_exception=True)
 
             elif role == "ARTIST_MANAGER":
-                print("user uuid", user.get("uuid"))
                 manager_serializer = UserProfileSerializer(
                     data={
                         "user_id": user.get("uuid", None),

@@ -50,7 +50,6 @@ class ArtistSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        # return Artist.objects.create(**validated_data)
         with connection.cursor() as c:
             c.execute(
                 """

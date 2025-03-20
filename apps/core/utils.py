@@ -1,9 +1,6 @@
-from apps.core.models import Artist
-
-
 def convert_tuples_to_dicts(tuples, field_names=None):
     if field_names is None:
-        field_names = [field.name for field in Artist._meta.fields]
+        raise Exception("Please provide field_names")
     result_list = []
     if isinstance(tuples, tuple):
         tuples = [tuples]
