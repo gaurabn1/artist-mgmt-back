@@ -18,19 +18,10 @@ class ArtistService:
                 c.execute(
                     """
                 UPDATE core_user
-                SET is_active = %s
+                SET is_active = %s, email = %s, updated_at = NOW()
                 WHERE email = %s
                 """,
-                    [is_active, artist.get("email", None)],
-                )
-
-                c.execute(
-                    """
-                    UPDATE core_user
-                    SET email = %s
-                    WHERE email = %s
-                    """,
-                    [new_email, artist.get("email", None)],
+                    [is_active, new_email, artist.get("email", None)],
                 )
         serializer = ArtistSerializer(artist, data=data, partial=True)
         serializer.is_valid(raise_exception=True)

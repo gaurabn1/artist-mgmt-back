@@ -36,6 +36,7 @@ class UserService:
                 artist_serializer.is_valid(raise_exception=True)
 
             elif role == "ARTIST_MANAGER":
+                print("user uuid", user.get("uuid"))
                 manager_serializer = UserProfileSerializer(
                     data={
                         "user_id": user.get("uuid", None),
@@ -50,7 +51,7 @@ class UserService:
                 manager_serializer.is_valid(raise_exception=True)
 
             if role == "ARTIST" and artist_serializer:
-                artist_serializer.save(user=user)
+                artist_serializer.save()
                 return {
                     "user": user.get("email", None),
                     "is_active": user.get("is_active", False),
@@ -58,7 +59,7 @@ class UserService:
                 }
 
             elif role == "ARTIST_MANAGER" and manager_serializer:
-                manager_serializer.save(user=user)
+                manager_serializer.save()
                 return {
                     "user": user.get("email", None),
                     "is_active": user.get("is_active", False),
