@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.core.models import Artist, User, UserProfile
+from apps.core.models import User, UserProfile
 
 
 class UserRegistrationSerializer(serializers.Serializer):
@@ -8,9 +8,9 @@ class UserRegistrationSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=User.Role.choices)
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True)
-    first_name = serializers.CharField(max_length=100)
-    last_name = serializers.CharField(max_length=100)
-    phone = serializers.CharField(max_length=20)
+    first_name = serializers.CharField(max_length=100, required=False)
+    last_name = serializers.CharField(max_length=100, required=False)
+    phone = serializers.CharField(max_length=20, required=False)
     dob = serializers.DateField()
     gender = serializers.ChoiceField(choices=UserProfile.Gender.choices)
     address = serializers.CharField()
@@ -33,14 +33,6 @@ class UserRegistrationSerializer(serializers.Serializer):
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError("User with this email already exists.")
         return attrs
-
-    def create(self, validated_data):
-        user = User.objects.create_user(
-            email=validated_data["email"],
-            password=validated_data["password"],
-            role=validated_data["role"],
-        )
-        return user
 
 
 class UserLoginSerializer(serializers.Serializer):

@@ -1,21 +1,58 @@
-from django.contrib.auth import authenticate
-from django.db import transaction
+from django.contrib.auth.hashers import make_password
+from django.db import connection, transaction
 
 from apps.artists.serializers import ArtistSerializer
+from apps.core.utils import convert_tuples_to_dicts
 from apps.profiles.serializers import UserProfileSerializer
 from apps.users.serializers import UserLoginSerializer, UserRegistrationSerializer
-from apps.users.utils import generate_jwt_token
+from apps.users.utils import JWTManager, authenticate
 
 
 class UserService:
+
+    @staticmethod
+    def create_user(data):
+        serializer = UserRegistrationSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        password = data.get("password", "")
+        hashed_password = make_password(password)
+        with connection.cursor() as c:
+            c.execute(
+                """
+                INSERT INTO core_user
+                (email, password, role, is_active, created_at, updated_at, is_staff, is_superuser)
+                VALUES (%s, %s, %s, %s, NOW(), NOW(), FALSE, FALSE)
+                RETURNING uuid, email, password, role, is_active
+                """,
+                [
+                    data.get("email", ""),
+                    hashed_password,
+                    data.get("role", ""),
+                    data.get("is_active", False),
+                ],
+            )
+            user = c.fetchone()
+            user = convert_tuples_to_dicts(
+                user,
+                [
+                    "uuid",
+                    "email",
+                    "password",
+                    "role",
+                    "is_active",
+                ],
+            )[0]
+            return user
+
     @staticmethod
     def register_user(data):
         with transaction.atomic():
             serializer = UserRegistrationSerializer(data=data)
             serializer.is_valid(raise_exception=True)
-            validated_data = serializer.validated_data
 
-            role = validated_data.get("role", "ARTIST")
+            user = UserService.create_user(data)
+
+            role = data.get("role", "ARTIST")
 
             artist_serializer = None
             manager_serializer = None
@@ -23,17 +60,14 @@ class UserService:
             if role == "ARTIST":
                 artist_serializer = ArtistSerializer(
                     data={
-                        "name": validated_data.get("name", ""),
-                        "first_released_year": validated_data.get(
-                            "first_released_year", None
-                        ),
-                        "no_of_album_released": validated_data.get(
-                            "no_of_album_released", None
-                        ),
-                        "gender": validated_data.get("gender", ""),
-                        "address": validated_data.get("address", ""),
-                        "dob": validated_data.get("dob", None),
-                        "manager": validated_data.get("manager", None),
+                        "user_id": user.get("uuid", None),
+                        "name": data.get("name", ""),
+                        "first_released_year": data.get("first_released_year", None),
+                        "no_of_album_released": data.get("no_of_album_released", 0),
+                        "gender": data.get("gender", ""),
+                        "address": data.get("address", ""),
+                        "dob": data.get("dob", None),
+                        "manager": data.get("manager", None),
                     }
                 )
                 artist_serializer.is_valid(raise_exception=True)
@@ -41,31 +75,30 @@ class UserService:
             elif role == "ARTIST_MANAGER":
                 manager_serializer = UserProfileSerializer(
                     data={
-                        "first_name": validated_data.get("first_name", ""),
-                        "last_name": validated_data.get("last_name", ""),
-                        "phone": validated_data.get("phone", ""),
-                        "gender": validated_data.get("gender", ""),
-                        "address": validated_data.get("address", ""),
-                        "dob": validated_data.get("dob", None),
+                        "user_id": user.get("uuid", None),
+                        "first_name": data.get("first_name", ""),
+                        "last_name": data.get("last_name", ""),
+                        "phone": data.get("phone", ""),
+                        "gender": data.get("gender", ""),
+                        "address": data.get("address", ""),
+                        "dob": data.get("dob", None),
                     }
                 )
                 manager_serializer.is_valid(raise_exception=True)
 
-            user = serializer.save()
-
             if role == "ARTIST" and artist_serializer:
-                artist_serializer.save(user=user)
+                artist_serializer.save()
                 return {
-                    "user": user.email,
-                    "is_active": user.is_active,
+                    "user": user.get("email", None),
+                    "is_active": user.get("is_active", False),
                     "artist": artist_serializer.data,
                 }
 
             elif role == "ARTIST_MANAGER" and manager_serializer:
-                manager_serializer.save(user=user)
+                manager_serializer.save()
                 return {
-                    "user": user.email,
-                    "is_active": user.is_active,
+                    "user": user.get("email", None),
+                    "is_active": user.get("is_active", False),
                     "manager": manager_serializer.data,
                 }
 
@@ -73,15 +106,16 @@ class UserService:
 
     @staticmethod
     def login_user(data):
+
         serializer = UserLoginSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        email = validated_data.get("email", None)
-        password = validated_data.get("password", None)
+        email = data.get("email", None)
+        password = data.get("password", None)
 
-        user = authenticate(email=email, password=password)
-        if user is not None and user.is_active:
-            access_token, refresh_token = generate_jwt_token(user)
+        user = authenticate(email=email, raw_password=password)
+        jwt_manager = JWTManager(user)
+        if user is not None and user.get("is_active", False):
+            access_token, refresh_token = jwt_manager.generate_jwt_token(user)
             return {
                 "user": email,
                 "tokens": {

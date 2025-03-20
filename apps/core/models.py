@@ -82,7 +82,7 @@ class Artist(BaseProfileModel):
 
 class Album(BaseModel):
     name = models.CharField(max_length=100)
-    image = models.ImageField(upload_to="album/", null=True, blank=True)
+    image = models.ImageField(upload_to="albums/", null=True, blank=True)
     no_of_tracks = models.IntegerField(null=True, blank=True, default=0)
     owner = models.ForeignKey(
         Artist, on_delete=models.SET_NULL, null=True, related_name="albums"
