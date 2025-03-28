@@ -10,8 +10,52 @@ class ArtistService:
     @staticmethod
     def serialize_data(data):
         serializer = ArtistSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        # serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            print(serializer.errors)
         return serializer
+
+    @staticmethod
+    def create_artist(data):
+        ArtistService.serialize_data(data)
+        with connection.cursor() as c:
+            c.execute(
+                """
+                INSERT INTO artists_artist
+                (name, first_released_year, no_of_album_released, dob, gender, address, manager_id, created_at, updated_at, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s)
+                RETURNING uuid, name, first_released_year, no_of_album_released, dob, gender, address, manager_id, user_id
+                """,
+                [
+                    data.get("name", ""),
+                    data.get("first_released_year", ""),
+                    data.get("no_of_album_released", 0),
+                    data.get("dob", ""),
+                    data.get("gender", ""),
+                    data.get("address", ""),
+                    data.get("manager", None),
+                    data.get("user_id", None),
+                ],
+            )
+            artist = c.fetchone()
+        if artist is None:
+            return None
+        artist = convert_tuples_to_dicts(
+            artist,
+            [
+                "uuid",
+                "name",
+                "first_released_year",
+                "no_of_album_released",
+                "dob",
+                "gender",
+                "address",
+                "manager_id",
+                "user_id",
+            ],
+        )[0]
+        serializer = ArtistSerializer(artist)
+        return serializer.data
 
     @staticmethod
     def update_artist(uuid, data):

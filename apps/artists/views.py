@@ -15,7 +15,7 @@ class ArtistView(APIView):
     def get(self, request):
         result = ArtistSelector.get_artists()
         if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(result, status=status.HTTP_404_NOT_FOUND)
         return Response(result, status=status.HTTP_200_OK)
 
 

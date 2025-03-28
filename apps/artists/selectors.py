@@ -35,7 +35,7 @@ class ArtistSelector:
 
         artists = convert_tuples_to_dicts(artists, ArtistSelector.FIELD_NAMES)
         if artists is None:
-            return None
+            return {"artists": []}
         serializer = ArtistSerializer(artists, many=True)
         return serializer.data
 
