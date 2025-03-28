@@ -15,6 +15,7 @@ from .serializers import MusicSerializer
 class GenreView(APIView):
     def get(self, request):
         genres = [genre[0] for genre in Music.Genre.choices]
+        print(genres)
         return Response(genres, status=status.HTTP_200_OK)
 
 

@@ -15,20 +15,20 @@ class AlbumView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        result = AlbumSelector.get_albums()
+        result = AlbumSelector.get_albums(request.headers)
         if result is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(result, status=status.HTTP_200_OK)
 
     def post(self, request):
-        result = AlbumService.create_album(request.data, request.FILES)
+        result = AlbumService.create_album(request.data, request.FILES, request.headers)
         if result is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_201_CREATED)
 
 
 class AlbumDetailView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
+    # parser_classes = (MultiPartParser, FormParser)
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uuid):

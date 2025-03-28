@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.albums.serializers import AlbumSerializer
 from apps.artists.serializers import ArtistSerializer
 from apps.core.models import Album, Artist, Music
 
@@ -7,11 +8,13 @@ from apps.core.models import Album, Artist, Music
 class MusicSerializer(serializers.Serializer):
     title = serializers.CharField(required=True)
     genre = serializers.ChoiceField(required=True, choices=Music.Genre.choices)
-    album = serializers.PrimaryKeyRelatedField(
+    album_id = serializers.PrimaryKeyRelatedField(
         queryset=Album.objects.all(), required=False
     )
-    artist = serializers.PrimaryKeyRelatedField(
-        queryset=Artist.objects.all(), required=True
+    album = AlbumSerializer(read_only=True)
+    artist = ArtistSerializer(read_only=True)
+    artist_id = serializers.PrimaryKeyRelatedField(
+        queryset=Artist.objects.all(), required=False
     )
 
     def to_representation(self, instance):

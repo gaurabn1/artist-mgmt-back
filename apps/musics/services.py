@@ -15,6 +15,7 @@ class MusicService:
     @staticmethod
     def create_music(data):
         MusicService.serialize_data(data)
+        print("D: ", data)
         with connection.cursor() as c:
             c.execute(
                 """

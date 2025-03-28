@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.users.services import UserService
+from apps.users.utils import JWTManager
 
 
 class UserRegistrationView(APIView):
@@ -25,9 +26,21 @@ class UserLoginView(APIView):
 
     def post(self, request):
         result = UserService.login_user(request.data)
-        if result is not None:
-            return Response(result, status=status.HTTP_200_OK)
-        return Response(
-            {"error": "Invalid credentials or user is not active"},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
+        return result
+
+
+class RefreshTokenView(APIView):
+    def post(self, request):
+        refresh_token = request.data.get("refresh_token", None)
+        tokens = JWTManager.refresh_jwt_token(refresh_token)
+        if tokens:
+            access_token, refresh_token = tokens
+            return Response(
+                {"tokens": {"access": access_token, "refresh": refresh_token}},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {"message": "Invalid token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

@@ -19,9 +19,6 @@ class BaseProfileModel(BaseModel):
         FEMALE = "F", "Female"
         OTHERS = "O", "Others"
 
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile"
-    )
     dob = models.DateField()
     gender = models.CharField(max_length=1, choices=Gender.choices)
     address = models.TextField()
