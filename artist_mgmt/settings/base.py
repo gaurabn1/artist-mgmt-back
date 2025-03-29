@@ -21,6 +21,7 @@ INSTALLED_APPS = [
 THIRD_PARTY_APPS = [
     "rest_framework",
     "corsheaders",
+    "debug_toolbar",
 ]
 
 CUSTOM_APPS = [
@@ -38,7 +39,13 @@ REST_FRAMEWORK = {
 
 INSTALLED_APPS += CUSTOM_APPS + THIRD_PARTY_APPS
 
+INTERNAL_IPS = [
+    "127.0.0.1",  # Local development
+    "localhost",
+]
+
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

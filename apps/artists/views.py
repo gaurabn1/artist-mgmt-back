@@ -8,15 +8,22 @@ from apps.artists.services import ArtistService
 from apps.users.authentication import JWTAuthentication
 
 
+class ArtistCurrectView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        artistSelector = ArtistSelector(request.headers)
+        return artistSelector.get_currect_artist()
+
+
 class ArtistView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        result = ArtistSelector.get_artists()
-        if result is None:
-            return Response(result, status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        artistSelector = ArtistSelector(request.headers)
+        return artistSelector.get_artists()
 
 
 class ArtistDetailView(APIView):

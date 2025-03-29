@@ -35,3 +35,28 @@ JWT_EXPIRATION_DELTA = datetime.timedelta(
 JWT_EXPIRATION_REFRESH_DELTA = datetime.timedelta(
     days=int(os.getenv("JWT_EXPIRATION_REFRESH_DELTA_DAYS", 3))
 )
+
+# Logging
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "level": "INFO",  # Set the level to INFO or lower to capture your logs
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        # Add your custom app logger
+        "apps.musics": {
+            "handlers": ["console"],
+            "level": "DEBUG",  # You can set it to INFO, DEBUG, etc.
+            "propagate": False,
+        },
+    },
+}

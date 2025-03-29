@@ -26,6 +26,11 @@ class UserLoginView(APIView):
 
     def post(self, request):
         result = UserService.login_user(request.data)
+        if result is None:
+            return Response(
+                {"error": "Invalid email or password"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return result
 
 

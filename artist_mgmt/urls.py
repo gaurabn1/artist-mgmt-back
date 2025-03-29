@@ -24,6 +24,7 @@ API_PREFIX = "api/v1"
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("__debug__/", include("debug_toolbar.urls")),
     path(f"{API_PREFIX}/", include("apps.users.urls")),
     path(f"{API_PREFIX}/artists/", include("apps.artists.urls")),
     path(f"{API_PREFIX}/musics/", include("apps.musics.urls")),

@@ -3,7 +3,7 @@ from datetime import datetime
 from django.db import connection
 from rest_framework import serializers
 
-from apps.core.models import Artist, User
+from apps.core.models import Artist, User, UserProfile
 from apps.core.utils import convert_tuples_to_dicts
 
 
@@ -12,7 +12,7 @@ class ArtistSerializer(serializers.Serializer):
     name = serializers.CharField()
     user_id = serializers.UUIDField(read_only=True, required=False)
     manager = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.filter(role=User.Role.ARTIST_MANAGER),
+        queryset=UserProfile.objects.all(),
         required=False,
         allow_null=True,
     )

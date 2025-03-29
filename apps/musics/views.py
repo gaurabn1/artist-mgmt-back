@@ -15,7 +15,6 @@ from .serializers import MusicSerializer
 class GenreView(APIView):
     def get(self, request):
         genres = [genre[0] for genre in Music.Genre.choices]
-        print(genres)
         return Response(genres, status=status.HTTP_200_OK)
 
 
@@ -24,16 +23,12 @@ class MusicView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        result = MusicSelector.get_musics()
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        musicSelector = MusicSelector(request.headers)
+        return musicSelector.get_musics()
 
     def post(self, request):
-        result = MusicService.create_music(request.data)
-        if result is None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        return Response(result, status=status.HTTP_201_CREATED)
+        musicService = MusicService(request.data, request.headers)
+        return musicService.create_music()
 
 
 class MusicDetailView(APIView):
@@ -41,19 +36,13 @@ class MusicDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uuid):
-        result = MusicSelector.get_music_by_id(uuid)
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        musicSelector = MusicSelector(request.headers)
+        return musicSelector.get_music_by_id(uuid)
 
     def put(self, request, uuid):
-        result = MusicService.update_music(uuid, request.data)
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        musicService = MusicService(request.data, request.headers)
+        return musicService.update_music(uuid)
 
     def delete(self, request, uuid):
-        is_deleted = MusicService.delete_music(uuid)
-        if is_deleted is not True:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        musicService = MusicService(request.data, request.headers)
+        return musicService.delete_music(uuid)
