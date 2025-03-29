@@ -19,9 +19,11 @@ class BaseProfileModel(BaseModel):
         FEMALE = "F", "Female"
         OTHERS = "O", "Others"
 
-    dob = models.DateField()
-    gender = models.CharField(max_length=1, choices=Gender.choices)
-    address = models.TextField()
+    dob = models.DateField(null=True, blank=True)
+    gender = models.CharField(
+        max_length=1, choices=Gender.choices, null=True, blank=True
+    )
+    address = models.TextField(null=True, blank=True)
 
     class Meta(BaseModel.Meta):
         abstract = True

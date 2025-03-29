@@ -10,9 +10,9 @@ class ArtistService:
     @staticmethod
     def serialize_data(data):
         serializer = ArtistSerializer(data=data)
-        # serializer.is_valid(raise_exception=True)
-        if not serializer.is_valid():
-            print(serializer.errors)
+        serializer.is_valid(raise_exception=True)
+        # if not serializer.is_valid():
+        #     print(serializer.errors)
         return serializer
 
     @staticmethod
