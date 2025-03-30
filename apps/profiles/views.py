@@ -15,10 +15,8 @@ class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        managers = ManagerSelector.get_managers()
-        if managers is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(managers, status=status.HTTP_200_OK)
+        managerSelector = ManagerSelector(request.headers)
+        return managerSelector.get_managers()
 
 
 class UserProfileDetailView(APIView):

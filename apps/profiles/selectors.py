@@ -1,4 +1,6 @@
 from django.db import connection
+from rest_framework import status
+from rest_framework.response import Response
 
 from apps.core.utils import convert_tuples_to_dicts
 from apps.profiles.serializers import UserProfileSerializer
@@ -18,8 +20,10 @@ class ManagerSelector:
         "role",
     ]
 
-    @staticmethod
-    def get_managers():
+    def __init__(self, headers):
+        self.headers = headers
+
+    def get_managers(self):
         with connection.cursor() as c:
             c.execute(
                 """
@@ -31,11 +35,11 @@ class ManagerSelector:
                 """
             )
             managers = c.fetchall()
+            if managers is None:
+                return Response(status=status.HTTP_404_NOT_FOUND)
         managers_data = convert_tuples_to_dicts(managers, ManagerSelector.FIELD_NAMES)
-        if managers_data is None:
-            return None
         serializer = UserProfileSerializer(managers_data, many=True)
-        return serializer.data
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @staticmethod
     def get_manager_by_id(uuid):
