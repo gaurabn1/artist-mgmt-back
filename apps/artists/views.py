@@ -3,7 +3,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.artists.permissions import IsNotArtist
 from apps.artists.selectors import ArtistSelector
 from apps.artists.services import ArtistService
 from apps.users.authentication import JWTAuthentication
@@ -11,7 +10,7 @@ from apps.users.authentication import JWTAuthentication
 
 class ArtistCurrectView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsNotArtist]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         artistSelector = ArtistSelector(request.headers)
@@ -20,7 +19,7 @@ class ArtistCurrectView(APIView):
 
 class ArtistView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsNotArtist]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         artistSelector = ArtistSelector(request.headers)
@@ -29,7 +28,7 @@ class ArtistView(APIView):
 
 class ArtistDetailView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsNotArtist]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, uuid):
         result = ArtistSelector.get_artist_by_id(uuid)
