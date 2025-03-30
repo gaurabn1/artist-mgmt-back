@@ -17,6 +17,15 @@ class ArtistCurrectView(APIView):
         return artistSelector.get_currect_artist()
 
 
+class ArtistCountView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        artistSelector = ArtistSelector(request.headers)
+        return artistSelector.get_artists_count()
+
+
 class ArtistView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -25,25 +34,23 @@ class ArtistView(APIView):
         artistSelector = ArtistSelector(request.headers)
         return artistSelector.get_artists()
 
+    def post(self, request):
+        artistService = ArtistService(request.data, request.headers)
+        return artistService.create_artist()
+
 
 class ArtistDetailView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uuid):
-        result = ArtistSelector.get_artist_by_id(uuid)
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        artistSelector = ArtistSelector(request.headers)
+        return artistSelector.get_artist_by_id(uuid)
 
     def put(self, request, uuid):
-        result = ArtistService.update_artist(uuid, request.data)
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        artistService = ArtistService(request.data, request.headers)
+        return artistService.update_artist(uuid)
 
     def delete(self, request, uuid):
-        is_deleted = ArtistService.delete_artist(uuid)
-        if is_deleted is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        artistService = ArtistService(request.headers)
+        return artistService.delete_artist(uuid)
