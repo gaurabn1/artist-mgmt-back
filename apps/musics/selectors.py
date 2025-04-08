@@ -1,10 +1,11 @@
 from django.db import connection
+from django.db.models import Count
 from rest_framework import status
 from rest_framework.exceptions import APIException
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
-from apps.core.models import Music
+from apps.core.models import Artist, Music, UserProfile
 from apps.core.utils import convert_tuples_to_dicts
 from apps.musics.serializers import MusicSerializer
 from apps.users.utils import get_payload
@@ -161,3 +162,40 @@ class MusicSelector:
         music_instance = [Music(**music) for music in music_dict]
         serializer = MusicSerializer(music_instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def get_genre_music_count(self):
+        payload = get_payload(self.headers)
+        if payload is None:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        user_role = payload.get("role", "")
+        user_id = payload.get("user_id", "")
+
+        if (
+            user_role != "ARTIST"
+            and user_role != "ARTIST_MANAGER"
+            and user_role != "SUPER_ADMIN"
+        ):
+            raise APIException("Unauthorized", status.HTTP_401_UNAUTHORIZED)
+
+        musics_count = None
+        if user_role == "ARTIST":
+            artist_id = Artist.objects.get(user_id=user_id).uuid
+            musics = Music.objects.filter(artist_id=artist_id)
+            musics_count = (
+                musics.values("genre").annotate(count=Count("genre")).order_by("genre")
+            )
+        if user_role == "ARTIST_MANAGER":
+            manager = UserProfile.objects.get(user_id=user_id)
+            artists_managed_by_manager = Artist.objects.filter(manager=manager)
+            musics = Music.objects.filter(artist__in=artists_managed_by_manager)
+            musics_count = (
+                musics.values("genre").annotate(count=Count("genre")).order_by("genre")
+            )
+        if user_role == "SUPER_ADMIN":
+            musics_count = (
+                Music.objects.values("genre")
+                .annotate(count=Count("genre"))
+                .order_by("genre")
+            )
+
+        return Response(musics_count, status=status.HTTP_200_OK)

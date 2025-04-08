@@ -112,7 +112,7 @@ class ArtistService:
         artist_dict = convert_tuples_to_dicts(artist, columns)[0]
         return Response(artist_dict, status=status.HTTP_201_CREATED)
 
-    def update_user_account(self):
+    def update_user_account(self, user_id):
         data = self.data
         if data is None:
             raise APIException("No data provided", status.HTTP_400_BAD_REQUEST)
@@ -124,10 +124,10 @@ class ArtistService:
             c.execute(
                 """
                 UPDATE core_user
-                SET password = %s, updated_at = NOW()
-                WHERE email = %s
+                SET email = %s, password = %s, updated_at = NOW()
+                WHERE uuid = %s
                 """,
-                [hashed_password, email],
+                [email, hashed_password, user_id],
             )
         return Response(status=status.HTTP_200_OK)
 
@@ -172,9 +172,9 @@ class ArtistService:
         if artist is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         with transaction.atomic():
-            password = data.get("password", None) or None
-            if password is not None:
-                self.update_user_account()
+            # password = data.get("password", None) or None
+            # if password is not None and payload["role"] != "ARTIST":
+            #     self.update_user_account(artist.get("user", None).get("uuid", None))
             with connection.cursor() as c:
                 c.execute(
                     """
@@ -197,10 +197,11 @@ class ArtistService:
                     ],
                 )
                 artist = c.fetchone()
-                columns = [col[0] for col in c.description]
                 if artist is None:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
+                columns = [col[0] for col in c.description]
         artist_dict = convert_tuples_to_dicts(artist, columns)
+        print(artist_dict)
         return Response(artist_dict, status=status.HTTP_200_OK)
 
     def delete_artist(self, uuid):

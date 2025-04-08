@@ -85,3 +85,10 @@ class MusicDetailView(APIView):
     def delete(self, request, uuid):
         musicService = MusicService(request)
         return musicService.delete_music(uuid)
+
+
+class GenreMusicView(APIView):
+
+    def get(self, request):
+        musicSelector = MusicSelector(request)
+        return musicSelector.get_genre_music_count()

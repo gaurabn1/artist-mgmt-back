@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from apps.artists.serializers import ArtistSerializer
 from apps.core.models import UserProfile
 from apps.core.utils import convert_tuples_to_dicts
 from apps.profiles.serializers import UserProfileSerializer
@@ -87,3 +88,11 @@ class ManagerSelector:
         if user_id is None:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         return self.get_manager_by_id(manager_id)
+
+    def get_artists_by_managers(self, uuid):
+        manager = UserProfile.objects.get(uuid=uuid)
+        serializer = UserProfileSerializer(manager)
+        artists = manager.artists_managed.all()
+        response = serializer.data
+        response["artists"] = ArtistSerializer(artists, many=True).data
+        return Response(response, status=status.HTTP_200_OK)

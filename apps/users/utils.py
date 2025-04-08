@@ -1,8 +1,10 @@
 import datetime
+import threading
 
 import jwt
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
+from django.core.mail import EmailMessage
 from django.db import connection
 
 from apps.core.utils import convert_tuples_to_dicts
@@ -19,7 +21,7 @@ class JWTManager:
             return None
         # Access Token
         access_payload = {
-            "user_id": str(user.get("uuid", None)),
+            "user_id": str(user.get("uuid", None) or user.get("user_id", None)),
             "email": user.get("email", None),
             "role": user.get("role", None),
             "exp": datetime.datetime.utcnow() + settings.JWT_EXPIRATION_DELTA,
@@ -31,7 +33,7 @@ class JWTManager:
 
         # Refresh Token
         refresh_payload = {
-            "user_id": str(user.get("uuid", None)),
+            "user_id": str(user.get("uuid", None) or user.get("user_id", None)),
             "email": user.get("email", None),
             "role": user.get("role", None),
             "exp": datetime.datetime.utcnow() + settings.JWT_EXPIRATION_REFRESH_DELTA,
@@ -80,7 +82,7 @@ class JWTManager:
                 settings.JWT_SECRET_KEY,
                 algorithms=[settings.JWT_ALGORITHM],
             )
-            jwt_manager = JWTManager(token=refresh_token, user=payload)
+            jwt_manager = JWTManager(user=payload)
             return jwt_manager.generate_jwt_token()
         except (jwt.ExpiredSignatureError, jwt.DecodeError):
             return None
@@ -122,3 +124,17 @@ def authenticate(email, raw_password):
 
 def get_payload(headers):
     return JWTManager.decode_jwt_token(headers.get("Authorization", "").split(" ")[1])
+
+
+def send_follow_email(subject, message, from_email, to_email):
+    email = EmailMessage(subject, message, from_email, [to_email])
+
+    def email_send():
+        try:
+            result = email.send()
+            print("Email Sent.", result)
+        except Exception as e:
+            print(f"Failed to send email: {e}")
+
+    email_thread = threading.Thread(target=email_send)
+    email_thread.start()

@@ -70,3 +70,21 @@ class GetUserView(APIView):
             managerSelector = ManagerSelector(request)
             return managerSelector.get_current_manager()
         return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+
+class RequestForgetPasswordView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        userService = UserService(request, request.data)
+        return userService.request_forget_password()
+
+
+class ResetPasswordView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        userService = UserService(request, request.data)
+        return userService.reset_password()

@@ -36,3 +36,12 @@ class UserProfileDetailView(APIView):
     def delete(self, request, uuid):
         managerService = ManagerService(request)
         return managerService.delete_manager(uuid)
+
+
+class ManagerArtistView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uuid):
+        managerSelector = ManagerSelector(request)
+        return managerSelector.get_artists_by_managers(uuid)

@@ -12,3 +12,4 @@ class AlbumSerializer(serializers.Serializer):
     owner = ArtistSerializer(read_only=True)
     no_of_tracks = serializers.IntegerField(read_only=True)
     image = serializers.ImageField(required=False, allow_null=True)
+    created_at = serializers.DateTimeField(read_only=True)

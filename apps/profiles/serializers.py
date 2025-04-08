@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from django.db import connection
 from rest_framework import serializers
 
 from apps.core.models import UserProfile
@@ -16,7 +15,21 @@ class UserProfileSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=UserProfile.Gender.choices)
     address = serializers.CharField()
     dob = serializers.DateField()
-    user = UserSerializer(required=False, allow_null=True)
+    user = UserSerializer(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+
+    def validate(self, attrs):
+        dob = attrs.get("dob", "")
+        current_date = datetime.now().date()
+        email = attrs.get("user", {}).get("email", "")
+
+        if email and UserProfile.objects.filter(user__email=email).exists():
+            raise serializers.ValidationError("User with this email already exists.")
+
+        if dob and dob > current_date:
+            raise serializers.ValidationError("Date of birth cannot be in the future.")
+
+        return attrs
 
 
 # class UserProfileSerializer(serializers.Serializer):

@@ -5,8 +5,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from apps.albums.serializers import AlbumSerializer
-from apps.core.models import Album
+from apps.core.models import Album, Music
 from apps.core.utils import convert_tuples_to_dicts
+from apps.musics.serializers import MusicSerializer
 from apps.users.utils import get_payload
 
 
@@ -162,17 +163,22 @@ class AlbumSelector:
         with connection.cursor() as c:
             c.execute(
                 """
-                SELECT  uuid, name, owner_id, no_of_tracks, image
+                SELECT  *
                 FROM albums_album
                 WHERE uuid = %s
                 """,
                 [uuid],
             )
             album = c.fetchone()
+            if album is None:
+                raise APIException("Album not found", status.HTTP_404_NOT_FOUND)
             columns = [col[0] for col in c.description]
-        if album is None:
-            raise APIException("Album not found", status.HTTP_404_NOT_FOUND)
         album_dict = convert_tuples_to_dicts(album, columns)
         album_instance = [Album(**album) for album in album_dict]
         serializer = AlbumSerializer(album_instance[0])
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # Get musics by album id
+        musics = Music.objects.filter(album__uuid=uuid)
+        response_data = serializer.data
+        response_data["musics"] = MusicSerializer(musics, many=True).data
+        return Response(response_data, status=status.HTTP_200_OK)

@@ -21,7 +21,7 @@ class ManagerService:
         serializer = UserProfileSerializer(data=data)
         if not serializer.is_valid():
             print(serializer.errors)
-        # serializer.is_valid(raise_exception=True)
+        serializer.is_valid(raise_exception=True)
         return serializer
 
     def create_user_account(self):
@@ -120,9 +120,9 @@ class ManagerService:
         if manager is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         with transaction.atomic():
-            password = data.get("password", None) or None
-            if password is not None:
-                self.update_user_account()
+            # password = data.get("password", None) or None
+            # if password is not None:
+            #     self.update_user_account()
             with connection.cursor() as c:
                 c.execute(
                     """
@@ -142,9 +142,9 @@ class ManagerService:
                     ],
                 )
                 manager = c.fetchone()
-                columns = [col[0] for col in c.description]
                 if manager is None:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
+                columns = [col[0] for col in c.description]
         manager_dict = convert_tuples_to_dicts(manager, columns)
         return Response(manager_dict, status=status.HTTP_200_OK)
 

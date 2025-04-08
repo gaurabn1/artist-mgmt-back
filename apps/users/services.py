@@ -1,15 +1,17 @@
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core import signing
+from django.core.cache import cache
 from django.db import connection, transaction
+from django.utils.http import unquote
 from rest_framework import status
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
-from apps.artists.serializers import ArtistSerializer
-from apps.artists.services import ArtistService
+from apps.core.models import User
 from apps.core.utils import convert_tuples_to_dicts
-from apps.profiles.serializers import UserProfileSerializer
 from apps.users.serializers import UserLoginSerializer, UserRegistrationSerializer
-from apps.users.utils import JWTManager, authenticate
+from apps.users.utils import JWTManager, authenticate, get_payload, send_follow_email
 
 
 class UserService:
@@ -108,3 +110,60 @@ class UserService:
                 )
             else:
                 raise APIException("Invalid credentials", status.HTTP_401_UNAUTHORIZED)
+
+    def request_forget_password(self):
+        email = self.data.get("email", None)
+        user = User.objects.filter(email=email).first()
+        token = signing.dumps(email)
+        cache.set(f"reset_token_{token}", True, timeout=900)
+        if user is None:
+            raise APIException("User not found", status.HTTP_404_NOT_FOUND)
+        try:
+            send_follow_email(
+                "Reset Password",
+                f"Visit this link: http://127.0.0.1:3000/reset-password/{token} to reset your password",
+                settings.EMAIL_HOST_USER,
+                user.email,
+            )
+            return Response(status=status.HTTP_200_OK)
+        except Exception as e:
+            raise APIException(
+                f"Failed to send email, Please check your email. {e}",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    def reset_password(self):
+        password = self.data.get("password", None)
+        token = self.data.get("token")
+        if not token:
+            raise APIException("Token is required", status.HTTP_400_BAD_REQUEST)
+        decoded_token = unquote(token)
+        try:
+            email = signing.loads(decoded_token, max_age=36000)
+        except signing.BadSignature:
+            raise APIException(
+                "Invalid token or token has expired", status.HTTP_400_BAD_REQUEST
+            )
+        if cache.get(f"reset_token_{token}") is None:
+            raise APIException(
+                "Token has already been used or expired", status.HTTP_400_BAD_REQUEST
+            )
+
+        with connection.cursor() as c:
+            c.execute(
+                """
+                UPDATE core_user
+                SET password = %s, updated_at = NOW()
+                WHERE email = %s
+                RETURNING uuid
+                """,
+                [make_password(password), email],
+            )
+            user = c.fetchone()
+            if user is None:
+                raise APIException(
+                    "Failed to update password", status.HTTP_400_BAD_REQUEST
+                )
+
+        cache.delete(f"reset_token_{token}")
+        return Response(status=status.HTTP_200_OK)

@@ -17,12 +17,6 @@ class ArtistSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=Artist.Gender.choices)
     address = serializers.CharField()
     manager = UserProfileSerializer(read_only=True)
-    # manager = serializers.PrimaryKeyRelatedField(
-    #     queryset=UserProfile.objects.all(),
-    #     required=False,
-    #     allow_null=True,
-    # )
-    # manager_name = serializers.CharField(read_only=True, null=True)
     user = UserSerializer(read_only=True)
 
     def validate(self, attrs):
