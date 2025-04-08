@@ -1,53 +1,54 @@
 from django.db import connection
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from apps.core.models import UserProfile
 from apps.core.utils import convert_tuples_to_dicts
 from apps.profiles.serializers import UserProfileSerializer
+from apps.users.utils import get_payload
 
 
 class ManagerSelector:
-    FIELD_NAMES = [
-        "uuid",
-        "first_name",
-        "last_name",
-        "phone",
-        "email",
-        "gender",
-        "address",
-        "dob",
-        "is_active",
-        "role",
-    ]
-
-    def __init__(self, headers):
-        self.headers = headers
+    def __init__(self, request):
+        self.headers = request.headers
+        self.request = request
+        self.page_size = request.query_params.get("page_size", 10)
 
     def get_managers(self):
         with connection.cursor() as c:
             c.execute(
                 """
-                SELECT 
-                m.uuid, m.first_name, m.last_name, m.phone, u.email, m.gender, m.address, m.dob, u.is_active
-                FROM core_user u
-                JOIN profiles_userprofile m ON u.uuid = m.user_id
+                SELECT m.*
+                FROM profiles_userprofile m
+                JOIN core_user u ON u.uuid = m.user_id
                 WHERE u.role = 'ARTIST_MANAGER';
                 """
             )
             managers = c.fetchall()
+            columns = [col[0] for col in c.description]
             if managers is None:
                 return Response(status=status.HTTP_404_NOT_FOUND)
-        managers_data = convert_tuples_to_dicts(managers, ManagerSelector.FIELD_NAMES)
-        serializer = UserProfileSerializer(managers_data, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        managers_dict = convert_tuples_to_dicts(managers, columns)
+        managers_instances = [UserProfile(**manager) for manager in managers_dict]
 
-    @staticmethod
-    def get_manager_by_id(uuid):
+        # paginate
+        paginator = PageNumberPagination()
+        paginator.page_size = self.page_size
+        paginated_managers = paginator.paginate_queryset(
+            managers_instances, request=self.request
+        )
+        serializer = UserProfileSerializer(paginated_managers, many=True)
+        return Response(
+            paginator.get_paginated_response(serializer.data).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def get_manager_by_id(self, uuid):
         with connection.cursor() as c:
             c.execute(
                 """
-                SELECT 
-                m.uuid, m.first_name, m.last_name, m.phone, u.email, m.gender, m.address, m.dob, u.is_active, u.role
+                SELECT m.*
                 FROM core_user u
                 JOIN profiles_userprofile m ON u.uuid = m.user_id
                 WHERE u.role = 'ARTIST_MANAGER' AND m.uuid = %s
@@ -55,8 +56,34 @@ class ManagerSelector:
                 [uuid],
             )
             manager = c.fetchone()
+            columns = [col[0] for col in c.description]
         if manager is None:
-            return None
-        manager_data = convert_tuples_to_dicts(manager, ManagerSelector.FIELD_NAMES)[0]
-        serializer = UserProfileSerializer(manager_data)
-        return serializer.data
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        managers_dict = convert_tuples_to_dicts(manager, columns)
+        managers_instances = [UserProfile(**manager) for manager in managers_dict]
+
+        serializer = UserProfileSerializer(managers_instances, many=True)
+        return Response(serializer.data[0], status=status.HTTP_200_OK)
+
+    def get_current_manager(self):
+        payload = get_payload(self.headers)
+        if payload is None:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        user_id = payload.get("user_id", "")
+        with connection.cursor() as c:
+            c.execute(
+                """
+                SELECT uuid
+                FROM profiles_userprofile
+                WHERE user_id = %s
+                
+                """,
+                [user_id],
+            )
+            manager_id = c.fetchone()
+            if not manager_id:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            manager_id = manager_id[0]
+        if user_id is None:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        return self.get_manager_by_id(manager_id)

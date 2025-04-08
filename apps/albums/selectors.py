@@ -1,24 +1,21 @@
 from django.db import connection
 from rest_framework import status
+from rest_framework.exceptions import APIException
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from apps.albums.serializers import AlbumSerializer
+from apps.core.models import Album
 from apps.core.utils import convert_tuples_to_dicts
 from apps.users.utils import get_payload
 
 
 class AlbumSelector:
-    FIELD_NAMES = [
-        "uuid",
-        "name",
-        "owner_id",
-        "no_of_tracks",
-        "image",
-        "owner",
-    ]
 
-    def __init__(self, headers):
-        self.headers = headers
+    def __init__(self, request):
+        self.headers = request.headers
+        self.request = request
+        self.page_size = request.query_params.get("page_size", 10)
 
     def get_album_artist(self, user_id):
         with connection.cursor() as c:
@@ -36,13 +33,12 @@ class AlbumSelector:
                 return Response(
                     {"detail": "Artist not found"}, status=status.HTTP_404_NOT_FOUND
                 )
-            artist_dict = convert_tuples_to_dicts(artist, ["uuid"])[0]
-            artist_id = artist_dict["uuid"]
+            artist_id = artist[0]
 
             ##### Get albums by artist
             c.execute(
                 """
-                SELECT  a.uuid, a.name, a.owner_id, a.no_of_tracks, a.image, b.name as owner
+                SELECT  a.*
                 FROM albums_album a
                 JOIN artists_artist b ON a.owner_id = b.uuid
                 WHERE a.owner_id = %s
@@ -50,13 +46,24 @@ class AlbumSelector:
                 [artist_id],
             )
             albums = c.fetchall()
+            columns = [col[0] for col in c.description]
             if albums is None:
-                return Response(
-                    {"detail": "Album not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-            albums_dict = convert_tuples_to_dicts(albums, self.FIELD_NAMES)
-            serializer = AlbumSerializer(albums_dict, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+                raise APIException("Albums not found", status.HTTP_404_NOT_FOUND)
+            albums_dict = convert_tuples_to_dicts(albums, columns)
+            albums_instance = [Album(**album) for album in albums_dict]
+
+            # paginate
+            paginator = PageNumberPagination()
+            paginator.page_size = self.page_size
+            paginated_albums = paginator.paginate_queryset(
+                albums_instance, request=self.request
+            )
+
+            serializer = AlbumSerializer(paginated_albums, many=True)
+            return Response(
+                paginator.get_paginated_response(serializer.data).data,
+                status=status.HTTP_200_OK,
+            )
 
     def get_album_manager(self, user_id):
         with connection.cursor() as c:
@@ -71,16 +78,13 @@ class AlbumSelector:
             )
             manager = c.fetchone()
             if manager is None:
-                return Response(
-                    {"detail": "Manager not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-            manager_dict = convert_tuples_to_dicts(manager, ["uuid"])[0]
-            manager_id = manager_dict["uuid"]
+                raise APIException("Manager not found", status.HTTP_404_NOT_FOUND)
+            manager_id = manager[0]
 
             # Get albums of manager's artists
             c.execute(
                 """
-                SELECT  a.uuid, a.name, a.owner_id, a.no_of_tracks, a.image, b.name as owner
+                SELECT  a.*
                 FROM albums_album a
                 JOIN artists_artist b ON a.owner_id = b.uuid
                 WHERE b.manager_id = %s
@@ -88,13 +92,24 @@ class AlbumSelector:
                 [manager_id],
             )
             albums = c.fetchall()
+            columns = [col[0] for col in c.description]
             if albums is None:
-                return Response(
-                    {"detail": "Album not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-            albums_dict = convert_tuples_to_dicts(albums, self.FIELD_NAMES)
-            serializer = AlbumSerializer(albums_dict, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+                return APIException("Albums not found", status.HTTP_404_NOT_FOUND)
+            albums_dict = convert_tuples_to_dicts(albums, columns)
+            albums_instance = [Album(**album) for album in albums_dict]
+
+            # paginate
+            paginator = PageNumberPagination()
+            paginator.page_size = self.page_size
+            paginated_artists = paginator.paginate_queryset(
+                albums_instance, request=self.request
+            )
+
+            serializer = AlbumSerializer(paginated_artists, many=True)
+            return Response(
+                paginator.get_paginated_response(serializer.data).data,
+                status=status.HTTP_200_OK,
+            )
 
     def get_albums(self):
         user_payload = get_payload(self.headers)
@@ -104,7 +119,11 @@ class AlbumSelector:
         user_id = user_payload.get("user_id", "")  # Get user id
 
         # Unauthorized other than artist and artist manager
-        if user_role != "ARTIST" and user_role != "ARTIST_MANAGER":
+        if (
+            user_role != "ARTIST"
+            and user_role != "ARTIST_MANAGER"
+            and user_role != "SUPER_ADMIN"
+        ):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
         if user_role == "ARTIST":
@@ -112,6 +131,32 @@ class AlbumSelector:
 
         if user_role == "ARTIST_MANAGER":
             return self.get_album_manager(user_id)
+
+        with connection.cursor() as c:
+            c.execute(
+                """
+                SELECT * FROM albums_album
+                """
+            )
+            albums = c.fetchall()
+            columns = [col[0] for col in c.description]
+            if albums is None:
+                raise APIException("Albums not found", status.HTTP_404_NOT_FOUND)
+            albums_dict = convert_tuples_to_dicts(albums, columns)
+            albums_instance = [Album(**album) for album in albums_dict]
+
+            # paginate
+            paginator = PageNumberPagination()
+            paginator.page_size = self.page_size
+            paginated_albums = paginator.paginate_queryset(
+                albums_instance, request=self.request
+            )
+
+            serializer = AlbumSerializer(paginated_albums, many=True)
+            return Response(
+                paginator.get_paginated_response(serializer.data).data,
+                status=status.HTTP_200_OK,
+            )
 
     def get_album_by_id(self, uuid):
         with connection.cursor() as c:
@@ -124,10 +169,10 @@ class AlbumSelector:
                 [uuid],
             )
             album = c.fetchone()
+            columns = [col[0] for col in c.description]
         if album is None:
-            return Response(
-                {"detail": "Album not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        album = convert_tuples_to_dicts(album, AlbumSelector.FIELD_NAMES)[0]
-        serializer = AlbumSerializer(album)
+            raise APIException("Album not found", status.HTTP_404_NOT_FOUND)
+        album_dict = convert_tuples_to_dicts(album, columns)
+        album_instance = [Album(**album) for album in album_dict]
+        serializer = AlbumSerializer(album_instance[0])
         return Response(serializer.data, status=status.HTTP_200_OK)

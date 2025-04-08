@@ -30,9 +30,9 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
 
 class UserProfile(BaseProfileModel):
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    phone = models.CharField(max_length=20)
+    first_name = models.CharField(max_length=100, null=True, blank=True)
+    last_name = models.CharField(max_length=100, null=True, blank=True)
+    phone = models.CharField(max_length=20, null=True, blank=True)
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="profile_user"
     )
@@ -75,7 +75,7 @@ class Artist(BaseProfileModel):
                 )
 
     def __str__(self) -> str:
-        return self.name
+        return self.name if self.name else self.user.email
 
 
 class Album(BaseModel):
@@ -95,7 +95,6 @@ class Album(BaseModel):
 
     def update_track_count(self):
         """Updates the number of tracks in the album."""
-        print("update")
         self.no_of_tracks = self.music_set.count()
         self.save()
 

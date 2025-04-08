@@ -1,7 +1,10 @@
 from django.db import connection
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
+from apps.albums.selectors import AlbumSelector
+from apps.artists.selectors import ArtistSelector
 from apps.core.utils import convert_tuples_to_dicts
 from apps.musics.serializers import MusicSerializer
 from apps.users.utils import get_payload
@@ -9,9 +12,45 @@ from apps.users.utils import get_payload
 
 class MusicService:
 
-    def __init__(self, data, headers):
-        self.data = data
-        self.headers = headers
+    def __init__(self, request):
+        self.data = request.data
+        self.headers = request.headers
+        self.request = request
+
+    def create_musics_bulk(self):
+        created_music = []
+
+        for music in self.data.get("rows"):
+            title = music.get("title", "")
+            genre = music.get("genre", "")
+            artist_id = music.get("artist_id", "")
+            album_id = music.get("album_id", "")
+
+            if not title and not genre and not artist_id and not album_id:
+                continue
+
+            with connection.cursor() as c:
+                c.execute(
+                    """
+                    INSERT INTO musics_music
+                    (title, album_id, genre, artist_id, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                    RETURNING uuid
+                    """,
+                    [title, album_id, genre, artist_id],
+                )
+                music = c.fetchone()
+                if not music:
+                    return Response(
+                        {"detail": "Music not created"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            if music:
+                self.update_album_and_artist_counts(album_id, artist_id)
+                created_music.append(music)
+
+        return Response(created_music, status=status.HTTP_201_CREATED)
 
     def update_album_and_artist_counts(self, album_id, artist_id):
         with connection.cursor() as cursor:
@@ -35,10 +74,10 @@ class MusicService:
                 [artist_id, artist_id],
             )
 
-        print("Album and artist counts updated")
-
     def serialize_data(self, data):
         serializer = MusicSerializer(data=data)
+        if not serializer.is_valid():
+            print(serializer.errors)
         serializer.is_valid(raise_exception=True)
         return serializer
 
@@ -101,6 +140,7 @@ class MusicService:
         data = self.data
         self.serialize_data(data)
         artist_id = data.get("artist", None) or None
+        album_id = data.get("album", None) or None
         with connection.cursor() as c:
             c.execute(
                 """
@@ -111,29 +151,19 @@ class MusicService:
                 """,
                 [
                     data.get("title", ""),
-                    data.get("album", None),
+                    album_id,
                     data.get("genre", ""),
                     artist_id,
                 ],
             )
             music = c.fetchone()
+            columns = [col[0] for col in c.description]
             album_id = music[2]
             artist_id = music[4]
             self.update_album_and_artist_counts(album_id, artist_id)
             if music is None:
-                return Response(
-                    {"message": "Music not created"}, status=status.HTTP_400_BAD_REQUEST
-                )
-            music_dict = convert_tuples_to_dicts(
-                music,
-                [
-                    "uuid",
-                    "title",
-                    "album_id",
-                    "genre",
-                    "artist_id",
-                ],
-            )[0]
+                raise APIException("Music not created", status.HTTP_400_BAD_REQUEST)
+            music_dict = convert_tuples_to_dicts(music, columns)[0]
             return Response(music_dict, status=status.HTTP_200_OK)
 
     def create_music(self):
@@ -143,18 +173,21 @@ class MusicService:
         role = payload.get("role", "")
         user_id = payload.get("user_id", "")
 
-        if role != "ARTIST" and role != "ARTIST_MANAGER":
+        if role != "ARTIST" and role != "ARTIST_MANAGER" and role != "SUPER_ADMIN":
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
         if role == "ARTIST":
             return self.create_music_artist(user_id)
 
-        if role == "ARTIST_MANAGER":
+        if role == "ARTIST_MANAGER" or role == "SUPER_ADMIN":
             return self.create_music_manager()
 
     def update_music(self, uuid):
         data = self.data
         self.serialize_data(data)
+
+        artist_id = data.get("artist", None) or None
+        album_id = data.get("album", None) or None
         with connection.cursor() as c:
             c.execute(
                 """
@@ -165,9 +198,9 @@ class MusicService:
                 """,
                 [
                     data.get("title", ""),
-                    data.get("album", None),
+                    album_id,
                     data.get("genre", ""),
-                    data.get("artist", None),
+                    artist_id,
                     uuid,
                 ],
             )

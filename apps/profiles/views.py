@@ -7,16 +7,18 @@ from apps.profiles.selectors import ManagerSelector
 from apps.profiles.services import ManagerService
 from apps.users.authentication import JWTAuthentication
 
-from .serializers import UserProfileSerializer
-
 
 class UserProfileView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        managerSelector = ManagerSelector(request.headers)
+        managerSelector = ManagerSelector(request)
         return managerSelector.get_managers()
+
+    def post(self, request):
+        managerService = ManagerService(request)
+        return managerService.create_manager()
 
 
 class UserProfileDetailView(APIView):
@@ -24,20 +26,13 @@ class UserProfileDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uuid):
-        manager = ManagerSelector.get_manager_by_id(uuid)
-        if manager is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        serializer = UserProfileSerializer(manager)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        managerSelector = ManagerSelector(request)
+        return managerSelector.get_manager_by_id(uuid)
 
     def put(self, request, uuid):
-        result = ManagerService.update_manager(uuid, request.data)
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(result, status=status.HTTP_200_OK)
+        managerService = ManagerService(request)
+        return managerService.update_manager(uuid)
 
     def delete(self, request, uuid):
-        result = ManagerService.delete_manager(uuid)
-        if result is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        managerService = ManagerService(request)
+        return managerService.delete_manager(uuid)

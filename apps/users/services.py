@@ -1,6 +1,7 @@
 from django.contrib.auth.hashers import make_password
 from django.db import connection, transaction
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from apps.artists.serializers import ArtistSerializer
@@ -13,10 +14,16 @@ from apps.users.utils import JWTManager, authenticate
 
 class UserService:
 
+    def __init__(self, request, data):
+        self.headers = request.headers
+        self.data = data
+
     @staticmethod
     def create_user(data):
         serializer = UserRegistrationSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        if serializer.is_valid():
+            print(serializer.errors)
+        # serializer.is_valid(raise_exception=True)
         password = data.get("password", "")
         hashed_password = make_password(password)
         with connection.cursor() as c:
@@ -73,9 +80,8 @@ class UserService:
             user = UserService.create_user(data)
             return {"user": user["email"]}
 
-    @staticmethod
-    def login_user(data):
-
+    def login_user(self):
+        data = self.data
         serializer = UserLoginSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         email = data.get("email", None)
@@ -83,7 +89,7 @@ class UserService:
 
         user = authenticate(email=email, raw_password=password)
         if not user:
-            return user  # return message if not user
+            raise APIException("Invalid credentials", status.HTTP_401_UNAUTHORIZED)
         else:
             jwt_manager = JWTManager(user)
             tokens = jwt_manager.generate_jwt_token()
@@ -91,7 +97,8 @@ class UserService:
                 access_token, refresh_token = tokens
                 return Response(
                     {
-                        "user": email,
+                        "user": user.get("email"),
+                        "role": user.get("role"),
                         "tokens": {
                             "access": access_token,
                             "refresh": refresh_token,
@@ -100,4 +107,4 @@ class UserService:
                     status=status.HTTP_200_OK,
                 )
             else:
-                return None
+                raise APIException("Invalid credentials", status.HTTP_401_UNAUTHORIZED)

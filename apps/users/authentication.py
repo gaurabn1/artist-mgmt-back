@@ -2,8 +2,9 @@ import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from jwt.exceptions import DecodeError, ExpiredSignatureError
+from rest_framework import status
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import APIException, AuthenticationFailed
 
 User = get_user_model()
 
@@ -12,8 +13,10 @@ class JWTAuthentication(BaseAuthentication):
     def authenticate(self, request):
         """Authenticate user based on JWT token"""
         token = self.get_token_from_request(request)
-        if not token:
-            return None
+        if token is None:
+            raise APIException(
+                "Token not found, please provide a token", status.HTTP_401_UNAUTHORIZED
+            )
 
         try:
             payload = jwt.decode(

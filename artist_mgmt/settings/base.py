@@ -34,7 +34,8 @@ CUSTOM_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ("apps.users.authentication.JWTAuthentication",)
+    "DEFAULT_AUTHENTICATION_CLASSES": ("apps.users.authentication.JWTAuthentication",),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
 INSTALLED_APPS += CUSTOM_APPS + THIRD_PARTY_APPS

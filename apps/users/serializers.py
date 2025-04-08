@@ -3,6 +3,13 @@ from rest_framework import serializers
 from apps.core.models import User
 
 
+class UserSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(read_only=True)
+    email = serializers.EmailField(required=True)
+    role = serializers.ChoiceField(choices=User.Role.choices, required=False)
+    is_active = serializers.BooleanField(read_only=True)
+
+
 class UserRegistrationSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=User.Role.choices)
     email = serializers.EmailField(required=True)
