@@ -195,11 +195,16 @@ class ArtistSelector:
             c.execute(
                 """
                 SELECT
-                    (SELECT count(*) FROM profiles_userprofile),
-                    (SELECT count(*) FROM profiles_userprofile WHERE created_at > %s);
+                    (SELECT count(p.*) FROM profiles_userprofile p
+                    JOIN core_user u ON u.uuid = p.user_id
+                    WHERE u.role = 'ARTIST_MANAGER'),
+                    (SELECT count(*) FROM profiles_userprofile p 
+                    JOIN core_user u ON u.uuid = p.user_id
+                    WHERE u.role = 'ARTIST_MANAGER' AND p.created_at > %s);
                 """,
                 [time_15_minutes_ago],
             )
+            manager_result = c.fetchone()
             c.execute(
                 """
                 SELECT 
@@ -231,8 +236,8 @@ class ArtistSelector:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(
             {
-                "manager_count": artist_result[0],
-                "managers_last_15_minutes": artist_result[1],
+                "manager_count": manager_result[0],
+                "managers_last_15_minutes": manager_result[1],
                 "artist_count": artist_result[0],
                 "artists_last_15_minutes": artist_result[1],
                 "album_count": album_result[0],

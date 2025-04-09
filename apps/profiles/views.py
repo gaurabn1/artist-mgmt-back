@@ -1,6 +1,4 @@
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.profiles.selectors import ManagerSelector
@@ -44,4 +42,13 @@ class ManagerArtistView(APIView):
 
     def get(self, request, uuid):
         managerSelector = ManagerSelector(request)
-        return managerSelector.get_artists_by_managers(uuid)
+        return managerSelector.get_artists_by_manager(uuid)
+
+
+class ArtistsByManagersView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        managerSelector = ManagerSelector(request)
+        return managerSelector.get_artists_by_managers()

@@ -201,7 +201,6 @@ class ArtistService:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
                 columns = [col[0] for col in c.description]
         artist_dict = convert_tuples_to_dicts(artist, columns)
-        print(artist_dict)
         return Response(artist_dict, status=status.HTTP_200_OK)
 
     def delete_artist(self, uuid):

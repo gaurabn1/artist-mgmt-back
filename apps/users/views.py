@@ -66,10 +66,9 @@ class GetUserView(APIView):
         if payload["role"] == "ARTIST":
             artistSelector = ArtistSelector(request)
             return artistSelector.get_currect_artist()
-        if payload["role"] == "ARTIST_MANAGER":
+        else:
             managerSelector = ManagerSelector(request)
             return managerSelector.get_current_manager()
-        return Response(status=status.HTTP_401_UNAUTHORIZED)
 
 
 class RequestForgetPasswordView(APIView):

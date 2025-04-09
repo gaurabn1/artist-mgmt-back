@@ -1,10 +1,13 @@
+from collections import defaultdict
+
 from django.db import connection
+from django.db.models import Count
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from apps.artists.serializers import ArtistSerializer
-from apps.core.models import UserProfile
+from apps.core.models import Artist, UserProfile
 from apps.core.utils import convert_tuples_to_dicts
 from apps.profiles.serializers import UserProfileSerializer
 from apps.users.utils import get_payload
@@ -40,6 +43,7 @@ class ManagerSelector:
             managers_instances, request=self.request
         )
         serializer = UserProfileSerializer(paginated_managers, many=True)
+
         return Response(
             paginator.get_paginated_response(serializer.data).data,
             status=status.HTTP_200_OK,
@@ -52,11 +56,12 @@ class ManagerSelector:
                 SELECT m.*
                 FROM core_user u
                 JOIN profiles_userprofile m ON u.uuid = m.user_id
-                WHERE u.role = 'ARTIST_MANAGER' AND m.uuid = %s
+                WHERE (u.role = 'ARTIST_MANAGER' OR u.role = 'SUPER_ADMIN') AND m.uuid = %s
                 """,
                 [uuid],
             )
             manager = c.fetchone()
+            print(manager)
             columns = [col[0] for col in c.description]
         if manager is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -77,7 +82,6 @@ class ManagerSelector:
                 SELECT uuid
                 FROM profiles_userprofile
                 WHERE user_id = %s
-                
                 """,
                 [user_id],
             )
@@ -89,10 +93,31 @@ class ManagerSelector:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         return self.get_manager_by_id(manager_id)
 
-    def get_artists_by_managers(self, uuid):
+    def get_artists_by_manager(self, uuid):
         manager = UserProfile.objects.get(uuid=uuid)
         serializer = UserProfileSerializer(manager)
         artists = manager.artists_managed.all()
         response = serializer.data
         response["artists"] = ArtistSerializer(artists, many=True).data
         return Response(response, status=status.HTTP_200_OK)
+
+    def get_artists_by_managers(self):
+        top5managers = (
+            UserProfile.objects.annotate(artist_count=Count("artists_managed"))
+            .filter(user__role="ARTIST_MANAGER")
+            .order_by("-artist_count")[:5]
+        )
+        artists_by_managers = Artist.objects.filter(manager__in=top5managers)
+        artist_by_manager = defaultdict(list)
+        for artist in artists_by_managers:
+            artist_by_manager[artist.manager.uuid].append(ArtistSerializer(artist).data)
+
+        response_data = {
+            str(manager.uuid): {
+                "manager": f"{manager.first_name} {manager.last_name}",
+                "artist": artist_by_manager.get(manager.uuid, []),
+            }
+            for manager in top5managers
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)

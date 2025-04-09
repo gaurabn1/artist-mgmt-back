@@ -2,7 +2,7 @@ import os
 import uuid
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from rest_framework import status
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
@@ -57,6 +57,7 @@ class AlbumService:
             if album is None:
                 raise APIException("Error creating an album", status.HTTP_404_NOT_FOUND)
             album_dict = convert_tuples_to_dicts(album, columns)[0]
+            self.increment_album_count(owner_id)
         return Response(album_dict, status=status.HTTP_201_CREATED)
 
     def update_to_the_database(self, album_id, image_path):
@@ -66,12 +67,13 @@ class AlbumService:
             c.execute(
                 """
                 UPDATE albums_album
-                SET name = %s, image = %s, no_of_tracks = %s, updated_at = NOW()
+                SET name = %s, owner_id = %s, image = %s, no_of_tracks = %s, updated_at = NOW()
                 WHERE uuid = %s
                 RETURNING uuid, name, owner_id, no_of_tracks, image
                 """,
                 [
                     data.get("name", ""),
+                    data.get("owner", None),
                     image_path,
                     data.get("no_of_tracks", 0),
                     album_id,
@@ -121,6 +123,8 @@ class AlbumService:
         image = self.files.get("image", None)
         data["image"] = image
         owner_id = data.get("owner", None)
+        if not owner_id:
+            raise APIException("Artist is required", status.HTTP_400_BAD_REQUEST)
 
         # path where image is saved
         image_path = self.save_image(image) if image else None
@@ -145,7 +149,7 @@ class AlbumService:
         if user_role == "ARTIST":
             return self.create_update_album_artist(user_id=user_id)
 
-        if user_role == "ARTIST_MANAGER" and user_role == "SUPER_ADMIN":
+        if user_role == "ARTIST_MANAGER" or user_role == "SUPER_ADMIN":
             return self.create_album_manager()
 
     def update_album(self, uuid):
@@ -165,20 +169,34 @@ class AlbumService:
         )
 
     def delete_album(self, uuid):
-        with connection.cursor() as c:
-            c.execute(
-                """
-                DELETE FROM albums_album 
-                WHERE uuid = %s
-                RETURNING TRUE
-                """,
-                [uuid],
-            )
-            is_deleted = c.fetchone()[0]
+        with transaction.atomic():
+            with connection.cursor() as c:
+                c.execute(
+                    """
+                    SELECT artists_artist.uuid
+                    FROM artists_artist
+                    JOIN albums_album ON artists_artist.uuid = albums_album.owner_id
+                    WHERE albums_album.uuid = %s
+                    """,
+                    [uuid],
+                )
+                artist = c.fetchone()
+                if artist is None:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+                c.execute(
+                    """
+                    DELETE FROM albums_album 
+                    WHERE uuid = %s
+                    RETURNING TRUE
+                    """,
+                    [uuid],
+                )
+                is_deleted = c.fetchone()[0]
+                self.decrement_album_count(artist[0])
 
-        if is_deleted is not True:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+            if is_deleted is not True:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     def increment_album_count(self, uuid):
         with connection.cursor() as c:
