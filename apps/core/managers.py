@@ -11,6 +11,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError("The given email must be set")
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
+        print(f"Setting password for {email}")  # Debugging line
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -18,7 +19,7 @@ class CustomUserManager(BaseUserManager):
     def create_user(self, email, password, **extra_fields):
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
-        extra_fields.setdefault("is_active", False)
+        extra_fields.setdefault("is_active", True)
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password, **extra_fields):

@@ -1,23 +1,31 @@
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core import signing
+from django.core.cache import cache
 from django.db import connection, transaction
+from django.utils.http import unquote
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
-from apps.artists.serializers import ArtistSerializer
-from apps.artists.services import ArtistService
+from apps.core.models import User
 from apps.core.utils import convert_tuples_to_dicts
-from apps.profiles.serializers import UserProfileSerializer
-from apps.users.serializers import (UserLoginSerializer,
-                                    UserRegistrationSerializer)
-from apps.users.utils import JWTManager, authenticate
+from apps.users.serializers import UserLoginSerializer, UserRegistrationSerializer
+from apps.users.utils import JWTManager, authenticate, get_payload, send_follow_email
 
 
 class UserService:
 
+    def __init__(self, request, data):
+        self.headers = request.headers
+        self.data = data
+
     @staticmethod
     def create_user(data):
         serializer = UserRegistrationSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        if serializer.is_valid():
+            print(serializer.errors)
+        # serializer.is_valid(raise_exception=True)
         password = data.get("password", "")
         hashed_password = make_password(password)
         with connection.cursor() as c:
@@ -25,14 +33,13 @@ class UserService:
                 """
                 INSERT INTO core_user
                 (email, password, role, is_active, created_at, updated_at, is_staff, is_superuser)
-                VALUES (%s, %s, %s, %s, NOW(), NOW(), FALSE, FALSE)
-                RETURNING uuid, email, role, is_active
+                VALUES (%s, %s, %s, True, NOW(), NOW(), FALSE, FALSE)
+                RETURNING uuid, email, role
                 """,
                 [
                     data.get("email", ""),
                     hashed_password,
                     data.get("role", ""),
-                    data.get("is_active", False),
                 ],
             )
             user = c.fetchone()
@@ -45,75 +52,55 @@ class UserService:
                     "is_active",
                 ],
             )[0]
+
+            if user.get("role", "") == "ARTIST":
+                with connection.cursor() as c:
+                    c.execute(
+                        """
+                        INSERT INTO artists_artist
+                        (user_id, created_at, updated_at)
+                        VALUES (%s, NOW(), NOW())
+                        """,
+                        [user["uuid"]],
+                    )
+
+            if user.get("role", "") == "ARTIST_MANAGER":
+                with connection.cursor() as c:
+                    c.execute(
+                        """
+                        INSERT INTO profiles_userprofile
+                        (user_id, created_at, updated_at)
+                        VALUES (%s, NOW(), NOW())
+                        """,
+                        [user["uuid"]],
+                    )
             return user
 
     @staticmethod
     def register_user(data):
         with transaction.atomic():
             user = UserService.create_user(data)
-            # role = data.get("role", "ARTIST")
-
-            # artist_serializer = None
-            # manager_serializer = None
-            #
-            # if role == "ARTIST":
-            #     artist_serializer = ArtistService.create_artist(
-            #         data={
-            #             "user_id": user.get("uuid", None),
-            #             "name": data.get("name", ""),
-            #             "first_released_year": data.get("first_released_year", 0),
-            #             "no_of_album_released": data.get("no_of_album_released", 0),
-            #             "gender": data.get("gender", ""),
-            #             "address": data.get("address", ""),
-            #             "dob": data.get("dob", None),
-            #             "manager": data.get("manager", None),
-            #         }
-            #     )
-            #
-            # elif role == "ARTIST_MANAGER":
-            #     manager_serializer = UserProfileSerializer(
-            #         data={
-            #             "user_id": user.get("uuid", None),
-            #             "first_name": data.get("first_name", ""),
-            #             "last_name": data.get("last_name", ""),
-            #             "phone": data.get("phone", ""),
-            #             "gender": data.get("gender", ""),
-            #             "address": data.get("address", ""),
-            #             "dob": data.get("dob", None),
-            #         }
-            #     )
-            #     manager_serializer.is_valid(raise_exception=True)
-            #
-            # if role == "ARTIST" and artist_serializer:
-            #     return artist_serializer
-            #
-            # elif role == "ARTIST_MANAGER" and manager_serializer:
-            #     manager_serializer.save()
-            #     return {
-            #         "user": user.get("email", None),
-            #         "is_active": user.get("is_active", False),
-            #         "manager": manager_serializer.data,
-            #     }
-
             return {"user": user["email"]}
 
-    @staticmethod
-    def login_user(data):
-
+    def login_user(self):
+        data = self.data
         serializer = UserLoginSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         email = data.get("email", None)
         password = data.get("password", None)
 
         user = authenticate(email=email, raw_password=password)
-        jwt_manager = JWTManager(user)
-        if user is not None and user.get("is_active", False):
+        if not user:
+            raise APIException("Invalid credentials", status.HTTP_401_UNAUTHORIZED)
+        else:
+            jwt_manager = JWTManager(user)
             tokens = jwt_manager.generate_jwt_token()
             if tokens:
                 access_token, refresh_token = tokens
                 return Response(
                     {
-                        "user": email,
+                        "user": user.get("email"),
+                        "role": user.get("role"),
                         "tokens": {
                             "access": access_token,
                             "refresh": refresh_token,
@@ -121,7 +108,62 @@ class UserService:
                     },
                     status=status.HTTP_200_OK,
                 )
-        else:
-            return Response(
-                {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
+            else:
+                raise APIException("Invalid credentials", status.HTTP_401_UNAUTHORIZED)
+
+    def request_forget_password(self):
+        email = self.data.get("email", None)
+        user = User.objects.filter(email=email).first()
+        token = signing.dumps(email)
+        cache.set(f"reset_token_{token}", True, timeout=900)
+        if user is None:
+            raise APIException("User not found", status.HTTP_404_NOT_FOUND)
+        try:
+            send_follow_email(
+                "Reset Password",
+                f"Visit this link: http://127.0.0.1:3000/reset-password/{token} to reset your password",
+                settings.EMAIL_HOST_USER,
+                user.email,
             )
+            return Response(status=status.HTTP_200_OK)
+        except Exception as e:
+            raise APIException(
+                f"Failed to send email, Please check your email. {e}",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    def reset_password(self):
+        password = self.data.get("password", None)
+        token = self.data.get("token")
+        if not token:
+            raise APIException("Token is required", status.HTTP_400_BAD_REQUEST)
+        decoded_token = unquote(token)
+        try:
+            email = signing.loads(decoded_token, max_age=36000)
+        except signing.BadSignature:
+            raise APIException(
+                "Invalid token or token has expired", status.HTTP_400_BAD_REQUEST
+            )
+        if cache.get(f"reset_token_{token}") is None:
+            raise APIException(
+                "Token has already been used or expired", status.HTTP_400_BAD_REQUEST
+            )
+
+        with connection.cursor() as c:
+            c.execute(
+                """
+                UPDATE core_user
+                SET password = %s, updated_at = NOW()
+                WHERE email = %s
+                RETURNING uuid
+                """,
+                [make_password(password), email],
+            )
+            user = c.fetchone()
+            if user is None:
+                raise APIException(
+                    "Failed to update password", status.HTTP_400_BAD_REQUEST
+                )
+
+        cache.delete(f"reset_token_{token}")
+        return Response(status=status.HTTP_200_OK)

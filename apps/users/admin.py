@@ -21,3 +21,8 @@ class UserAdmin(admin.ModelAdmin):
     ]
     list_display = ["email", "role", "is_active"]
     inlines = [UserProfileInline]
+
+    def save_model(self, request, obj, form, change):
+        if obj.password:
+            obj.set_password(obj.password)
+        super().save_model(request, obj, form, change)

@@ -16,7 +16,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=Role.choices)
-    is_active = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
@@ -30,9 +30,9 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
 
 class UserProfile(BaseProfileModel):
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    phone = models.CharField(max_length=20)
+    first_name = models.CharField(max_length=100, null=True, blank=True)
+    last_name = models.CharField(max_length=100, null=True, blank=True)
+    phone = models.CharField(max_length=20, null=True, blank=True)
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="profile_user"
     )
@@ -46,19 +46,19 @@ class UserProfile(BaseProfileModel):
 
 
 class Artist(BaseProfileModel):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, null=True, blank=True)
     first_released_year = models.IntegerField(null=True, blank=True)
     no_of_album_released = models.IntegerField(null=True, blank=True, default=0)
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="artist_user"
     )
     manager = models.ForeignKey(
-        User,
+        UserProfile,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="artists_managed",
-        limit_choices_to={"role": User.Role.ARTIST_MANAGER},
+        limit_choices_to={"user__role": User.Role.ARTIST_MANAGER},
     )
 
     class Meta(BaseProfileModel.Meta):
@@ -66,8 +66,6 @@ class Artist(BaseProfileModel):
         app_label = "artists"
 
     def clean(self):
-        if self.manager and self.manager.role != User.Role.ARTIST_MANAGER:
-            raise ValidationError("Manager must be an artist manager.")
 
         if self.first_released_year:
             current_year = datetime.datetime.now().year
@@ -77,7 +75,7 @@ class Artist(BaseProfileModel):
                 )
 
     def __str__(self) -> str:
-        return self.name
+        return self.name if self.name else self.user.email
 
 
 class Album(BaseModel):
@@ -94,6 +92,11 @@ class Album(BaseModel):
 
     def __str__(self) -> str:
         return self.name
+
+    def update_track_count(self):
+        """Updates the number of tracks in the album."""
+        self.no_of_tracks = self.music_set.count()
+        self.save()
 
 
 class Music(BaseModel):
@@ -120,6 +123,24 @@ class Music(BaseModel):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs):
+        old_album = None
+        if self.pk:  # If the object is being updated (not created)
+            old_album = Music.objects.get(pk=self.pk).album
+        super().save(*args, **kwargs)
+        if self.album:
+            self.album.update_track_count()
+
+        if old_album and old_album != self.album:
+            old_album.update_track_count()
+
+    def delete(self, *args, **kwargs):
+        album = self.album
+        super().delete(*args, **kwargs)
+        if album:
+            album.update_track_count()
+        return album
 
     class Meta(BaseModel.Meta):
         app_label = "musics"

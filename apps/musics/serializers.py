@@ -6,6 +6,20 @@ from apps.core.models import Album, Artist, Music
 
 
 class MusicSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(read_only=True)
+    title = serializers.CharField(required=True)
+    genre = serializers.ChoiceField(required=True, choices=Music.Genre.choices)
+    album = AlbumSerializer(read_only=True)
+    artist = ArtistSerializer(read_only=True)
+    artist_id = serializers.PrimaryKeyRelatedField(
+        queryset=Artist.objects.all(), required=False
+    )
+    album_id = serializers.PrimaryKeyRelatedField(
+        queryset=Album.objects.all(), required=False
+    )
+
+
+class MusicSerializers(serializers.Serializer):
     title = serializers.CharField(required=True)
     genre = serializers.ChoiceField(required=True, choices=Music.Genre.choices)
     album_id = serializers.PrimaryKeyRelatedField(
