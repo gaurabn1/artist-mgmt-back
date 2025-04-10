@@ -61,7 +61,6 @@ class ManagerSelector:
                 [uuid],
             )
             manager = c.fetchone()
-            print(manager)
             columns = [col[0] for col in c.description]
         if manager is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
