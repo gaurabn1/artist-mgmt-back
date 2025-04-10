@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.models import Artist, Music
+from apps.core.models import Artist, Music, UserProfile
 from apps.musics.selectors import MusicSelector
 from apps.musics.services import MusicService
 from apps.users.authentication import JWTAuthentication
@@ -39,12 +39,14 @@ class MusicCSVView(APIView):
         musics = musics_response.data.get("results", [])
         if payload["role"] == "ARTIST":
             current_artist_id = payload["user_id"]
+            artist_uuid = Artist.objects.get(user_id=current_artist_id).uuid
             musics = [
-                music for music in musics if music.get("artist_id") == current_artist_id
+                music for music in musics if music.get("artist_id") == artist_uuid
             ]
         elif payload["role"] == "ARTIST_MANAGER":
             current_manager_id = payload["user_id"]
-            managed_artists = Artist.objects.filter(manager__uuid=current_manager_id)
+            manager_uuid = UserProfile.objects.get(user_id=current_manager_id).uuid
+            managed_artists = Artist.objects.filter(manager__uuid=manager_uuid)
             managed_artist_ids = [artist.uuid for artist in managed_artists]
             musics = [
                 music

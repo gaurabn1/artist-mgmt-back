@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from apps.core.models import User
 from apps.core.utils import convert_tuples_to_dicts
 from apps.users.serializers import UserLoginSerializer, UserRegistrationSerializer
-from apps.users.utils import JWTManager, authenticate, get_payload, send_follow_email
+from apps.users.utils import JWTManager, authenticate, send_follow_email
 
 
 class UserService:
@@ -25,7 +25,7 @@ class UserService:
         serializer = UserRegistrationSerializer(data=data)
         if serializer.is_valid():
             print(serializer.errors)
-        # serializer.is_valid(raise_exception=True)
+        serializer.is_valid(raise_exception=True)
         password = data.get("password", "")
         hashed_password = make_password(password)
         with connection.cursor() as c:

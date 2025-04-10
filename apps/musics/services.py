@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from apps.albums.selectors import AlbumSelector
 from apps.artists.selectors import ArtistSelector
+from apps.core.models import Album, Artist
 from apps.core.utils import convert_tuples_to_dicts
 from apps.musics.serializers import MusicSerializer
 from apps.users.utils import get_payload
@@ -27,6 +28,18 @@ class MusicService:
             album_id = music.get("album_id", "")
 
             if not title and not genre and not artist_id and not album_id:
+                continue
+
+            album = Album.objects.filter(uuid=album_id).first()
+            artist = Artist.objects.filter(uuid=artist_id).first()
+
+            if not album or not artist:
+                continue
+
+            if album and album.owner != artist:
+                continue
+
+            if not Album.objects.filter(uuid=album_id).exists():
                 continue
 
             with connection.cursor() as c:
@@ -140,6 +153,8 @@ class MusicService:
         data = self.data
         self.serialize_data(data)
         artist_id = data.get("artist", None) or None
+        if artist_id is None:
+            raise APIException("Artist not provided", status.HTTP_400_BAD_REQUEST)
         album_id = data.get("album", None) or None
         with connection.cursor() as c:
             c.execute(

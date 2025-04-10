@@ -25,7 +25,6 @@ class ArtistCountView(APIView):
 
 
 class ArtistView(APIView):
-    permission_classes = []
 
     def get(self, request):
         artistSelector = ArtistSelector(request)

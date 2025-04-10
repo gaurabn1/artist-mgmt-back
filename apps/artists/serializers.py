@@ -45,6 +45,11 @@ class ArtistSerializer(serializers.Serializer):
                 "Date of birth cannot be greater than first released year."
             )
 
+        if first_released_year and dob and first_released_year - dob.year < 4:
+            raise ValidationError(
+                "There should be at least a 4-year gap between the date of birth and the first released year."
+            )
+
         return attrs
 
     def validate_no_of_album_released(self, value):

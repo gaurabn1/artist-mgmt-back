@@ -60,8 +60,12 @@ class ArtistService:
         if payload is None:
             raise APIException("Failed to create artist", status.HTTP_401_UNAUTHORIZED)
 
-        manager = data.get("manager", None)
-        manager_id = manager.get("uuid", None)
+        manager_id = None
+        if payload["role"] == "SUPER_ADMIN":
+            manager = data.get("manager", None)
+            manager_id = manager.get("uuid", None)
+            if not manager_id:
+                raise APIException("Manager not provided", status.HTTP_400_BAD_REQUEST)
         if payload["role"] == "ARTIST_MANAGER":
             manager_userid = payload.get("user_id", None)
 
