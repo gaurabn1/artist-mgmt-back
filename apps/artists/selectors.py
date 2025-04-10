@@ -53,6 +53,7 @@ class ArtistSelector:
                     LEFT JOIN albums_album al ON a.uuid = al.owner_id
                     LEFT JOIN musics_music mu ON a.uuid = mu.artist_id
                     GROUP BY a.name
+                    ORDER BY album DESC
                     LIMIT 5
                     """
                 )
@@ -85,6 +86,7 @@ class ArtistSelector:
                 LEFT JOIN musics_music mu ON a.uuid = mu.artist_id
                 WHERE a.manager_id = %s
                 GROUP BY a.name
+                ORDER BY album DESC
                 LIMIT 4
                 """,
                     [manager[0]],
