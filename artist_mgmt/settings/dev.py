@@ -29,8 +29,9 @@ CORS_ORIGIN_WHITELIST = [
 # JWT
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "secret")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
 JWT_EXPIRATION_DELTA = datetime.timedelta(
-    hours=int(os.getenv("JWT_EXPIRATION_DELTA_HOURS", 1))
+    minutes=int(os.getenv("JWT_EXPIRATION_DELTA_MINUTES", 15))
 )
 JWT_EXPIRATION_REFRESH_DELTA = datetime.timedelta(
     days=int(os.getenv("JWT_EXPIRATION_REFRESH_DELTA_DAYS", 3))
